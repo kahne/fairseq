@@ -205,7 +205,7 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
             '--encoder-freezing-updates',
             type=int,
             metavar='N',
-            help='freeze encoder for first N updates',
+            help='freeze encoder for first N updates'
         )
 
     @classmethod

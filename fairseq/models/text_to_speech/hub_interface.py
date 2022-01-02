@@ -87,12 +87,12 @@ class TTSHubInterface(nn.Module):
             task.data_cfg.hub.get("preserve_punct", False),
             task.data_cfg.hub.get("to_simplified_zh", False),
         )
-        if verbose:
-            logger.info(f"phonemized: {phonemized}")
         tkn_cfg = task.data_cfg.bpe_tokenizer
         tokenized = cls.tokenize(phonemized, tkn_cfg)
         if verbose:
-            logger.info(f"tokenized: {phonemized}")
+            logger.info(f"text: {text}")
+            logger.info(f"phonemized: {phonemized}")
+            logger.info(f"tokenized: {tokenized}")
 
         spk = task.data_cfg.hub.get("speaker", speaker)
         n_speakers = len(task.speaker_to_id or {})
@@ -116,8 +116,13 @@ class TTSHubInterface(nn.Module):
             "speaker": spk,
         }
 
-    def predict(self, text: str, speaker: Optional[int] = None):
-        sample = self.get_model_input(self.task, text, speaker)
+    def predict(
+            self,
+            text: str,
+            speaker: Optional[int] = None,
+            verbose: bool = False
+    ):
+        sample = self.get_model_input(self.task, text, speaker, verbose=verbose)
         self.model.eval()
         generator = self.task.build_generator([self.model], self.cfg)
         generation = generator.generate(self.model, sample)

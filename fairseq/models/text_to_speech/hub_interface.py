@@ -96,7 +96,7 @@ class TTSHubInterface(nn.Module):
             cfg_hub.get("preserve_punct", False),
             cfg_hub.get("to_simplified_zh", False),
         )
-        tkn_cfg = task.data_cfg.config.get("bpe_tokenizer", {})
+        tkn_cfg = task.data_cfg.bpe_tokenizer
         tokenized = cls.tokenize(phonemized, tkn_cfg)
         spk = cls._get_speaker(task, speaker)
         spk = None if spk is None else torch.Tensor([[spk]]).long()

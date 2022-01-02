@@ -319,6 +319,14 @@ class TTSTransformerModel(FairseqEncoderDecoderModel):
         base_url = "http://dl.fbaipublicfiles.com/fairseq/s2"
         model_ids = [
             "tts_transformer-en-ljspeech",
+            "tts_transformer-en-200_speaker-cv4",
+            "tts_transformer-es-css10",
+            "tts_transformer-fr-cv7_css10",
+            "tts_transformer-ru-cv7_css10",
+            "tts_transformer-zh-cv7_css10",
+            "tts_transformer-ar-cv7_css10",
+            "tts_transformer-tr-cv7_css10",
+            "tts_transformer-vi-cv7"
         ]
         return {i: f"{base_url}/{i}.tar.gz" for i in model_ids}
 
@@ -344,7 +352,6 @@ class TTSTransformerModel(FairseqEncoderDecoderModel):
             **kwargs,
         )
 
-        logger.info(x["args"])
         return TTSHubInterface(x["args"], x["task"], x["models"][0])
 
     @staticmethod

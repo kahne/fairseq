@@ -17,7 +17,6 @@ class TTSHubInterface(nn.Module):
         self.cfg = cfg
         self.task = task
         self.model = model
-        self.data_cfg_hub = self.task.data_cfg.config.get("hub", {})
         # this is useful for determining the device
         self.register_buffer("_float_tensor", torch.tensor([0], dtype=torch.float))
 
@@ -76,9 +75,10 @@ class TTSHubInterface(nn.Module):
         else:
             return text
 
-    def _get_speaker(self, speaker: Optional[int] = None):
-        speaker = self.data_cfg_hub.get("speaker", speaker)
-        n_speakers = len(self.task.speaker_to_id or {})
+    @classmethod
+    def _get_speaker(cls, task, speaker: Optional[int] = None):
+        speaker = task.data_cfg.config.get("hub", {}).get("speaker", speaker)
+        n_speakers = len(task.speaker_to_id or {})
         if speaker is None:
             if n_speakers > 0:
                 speaker = random.randint(0, n_speakers - 1)
@@ -86,28 +86,24 @@ class TTSHubInterface(nn.Module):
             speaker = max(0, min(speaker, n_speakers - 1))
         return speaker
 
-    def predict(
-            self,
-            text: str,
-            speaker: Optional[int] = None,
-    ):
-        self.model.eval()
-
-        phonemized = self.phonemize(
+    @classmethod
+    def get_model_input(cls, task, text: str, speaker: Optional[int] = None):
+        cfg_hub = task.data_cfg.config.get("hub", {})
+        phonemized = cls.phonemize(
             text,
-            self.data_cfg_hub.get("lang", None),
-            self.data_cfg_hub.get("phonemizer", None),
-            self.data_cfg_hub.get("preserve_punct", False),
-            self.data_cfg_hub.get("to_simplified_zh", False),
+            cfg_hub.get("lang", None),
+            cfg_hub.get("phonemizer", None),
+            cfg_hub.get("preserve_punct", False),
+            cfg_hub.get("to_simplified_zh", False),
         )
-        tkn_cfg = self.task.data_cfg.config.get("bpe_tokenizer", {})
-        tokenized = self.tokenize(phonemized, tkn_cfg)
-        spk = self._get_speaker(speaker)
+        tkn_cfg = task.data_cfg.config.get("bpe_tokenizer", {})
+        tokenized = cls.tokenize(phonemized, tkn_cfg)
+        spk = cls._get_speaker(task, speaker)
         spk = None if spk is None else torch.Tensor([[spk]]).long()
 
-        src_tokens = self.task.src_dict.encode_line(tokenized).view(1, -1)
+        src_tokens = task.src_dict.encode_line(tokenized).view(1, -1)
         src_lengths = torch.Tensor([len(tokenized.split())]).long()
-        sample = {
+        return {
             "net_input": {
                 "src_tokens": src_tokens,
                 "src_lengths": src_lengths,
@@ -116,6 +112,10 @@ class TTSHubInterface(nn.Module):
             "target_lengths": None,
             "speaker": spk,
         }
+
+    def predict(self, text: str, speaker: Optional[int] = None):
+        sample = self.get_model_input(self.task, text, speaker)
+        self.model.eval()
         generator = self.task.build_generator([self.model], self.cfg)
         generation = generator.generate(self.model, sample)
-        return generation[0]["waveform"]
+        return generation[0]["waveform"], self.task.sr

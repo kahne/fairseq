@@ -8,7 +8,6 @@ import unittest
 import torch
 from tqdm import tqdm
 
-from fairseq.checkpoint_utils import load_model_ensemble_and_task
 from fairseq import utils
 from fairseq.tasks.text_to_speech import batch_mel_cepstral_distortion
 from tests.speech import TestFairseqSpeech
@@ -21,38 +20,25 @@ class TestFastSpeech2(TestFairseqSpeech):
 
     @torch.no_grad()
     def test_ljspeech_fastspeech2_checkpoint(self):
-        checkpoint_filename = "ljspeech_fastspeech2_g2p.pt"
-        path = self.download(self.base_url, self.root, checkpoint_filename)
-
-        models, cfg, task = load_model_ensemble_and_task(
-            [path.as_posix()], arg_overrides={
-                "data": self.root.as_posix(),
+        models, cfg, task, generator = self.download_and_load_checkpoint(
+            "ljspeech_fastspeech2_g2p.pt",
+            arg_overrides={
                 "config_yaml": "cfg_ljspeech_g2p.yaml",
                 "vocoder": "griffin_lim",
-                "fp16": False
-            }
+                "fp16": False,
+            },
         )
-        if self.use_cuda:
-            for model in models:
-                model.cuda()
 
-        test_split = "ljspeech_test"
-        task.load_dataset(test_split)
-        batch_iterator = task.get_batch_iterator(
-            dataset=task.dataset(test_split),
-            max_tokens=65_536, max_positions=4_096, num_workers=1
-        ).next_epoch_itr(shuffle=False)
+        batch_iterator = self.get_batch_iterator(task, "ljspeech_test", 65_536, 4_096)
         progress = tqdm(batch_iterator, total=len(batch_iterator))
-        generator = task.build_generator(models, cfg)
-
-        mcd, n_samples = 0., 0
+        mcd, n_samples = 0.0, 0
         for sample in progress:
             sample = utils.move_to_cuda(sample) if self.use_cuda else sample
             hypos = generator.generate(models[0], sample, has_targ=True)
             rets = batch_mel_cepstral_distortion(
                 [hypo["targ_waveform"] for hypo in hypos],
                 [hypo["waveform"] for hypo in hypos],
-                sr=task.sr
+                sr=task.sr,
             )
             mcd += sum(d.item() for d, _ in rets)
             n_samples += len(sample["id"].tolist())

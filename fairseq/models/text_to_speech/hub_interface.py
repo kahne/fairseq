@@ -78,7 +78,7 @@ class TTSHubInterface(nn.Module):
             task,
             text: str,
             speaker: Optional[int] = None,
-            verbose: bool = False
+            verbose_log: bool = False
     ):
         phonemized = cls.phonemize(
             text,
@@ -89,7 +89,7 @@ class TTSHubInterface(nn.Module):
         )
         tkn_cfg = task.data_cfg.bpe_tokenizer
         tokenized = cls.tokenize(phonemized, tkn_cfg)
-        if verbose:
+        if verbose_log:
             logger.info(f"text: {text}")
             logger.info(f"phonemized: {phonemized}")
             logger.info(f"tokenized: {tokenized}")
@@ -100,7 +100,7 @@ class TTSHubInterface(nn.Module):
             spk = random.randint(0, n_speakers - 1)
         if spk is not None:
             spk = max(0, min(spk, n_speakers - 1))
-        if verbose:
+        if verbose_log:
             logger.info(f"speaker: {spk}")
         spk = None if spk is None else torch.Tensor([[spk]]).long()
 
@@ -120,9 +120,11 @@ class TTSHubInterface(nn.Module):
             self,
             text: str,
             speaker: Optional[int] = None,
-            verbose: bool = False
+            verbose_log: bool = False
     ):
-        sample = self.get_model_input(self.task, text, speaker, verbose=verbose)
+        sample = self.get_model_input(
+            self.task, text, speaker, verbose_log=verbose_log
+        )
         self.model.eval()
         generator = self.task.build_generator([self.model], self.cfg)
         generation = generator.generate(self.model, sample)

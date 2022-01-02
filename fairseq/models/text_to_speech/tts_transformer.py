@@ -341,7 +341,6 @@ class TTSTransformerModel(FairseqEncoderDecoderModel):
             **kwargs,
     ):
         from fairseq import hub_utils
-
         x = hub_utils.from_pretrained(
             model_name_or_path,
             checkpoint_file,
@@ -351,7 +350,6 @@ class TTSTransformerModel(FairseqEncoderDecoderModel):
             fp16=fp16,
             **kwargs,
         )
-
         return TTSHubInterface(x["args"], x["task"], x["models"][0])
 
     @staticmethod

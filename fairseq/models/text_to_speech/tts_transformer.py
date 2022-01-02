@@ -339,6 +339,8 @@ class TTSTransformerModel(FairseqEncoderDecoderModel):
             checkpoint_file,
             data_name_or_path,
             archive_map=cls.hub_models(),
+            vocoder=vocoder,
+            fp16=fp16,
             **kwargs,
         )
 

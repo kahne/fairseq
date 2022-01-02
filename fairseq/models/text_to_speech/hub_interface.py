@@ -3,12 +3,15 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+import logging
 from pathlib import Path
 from typing import Optional, Dict
 import random
 
 import torch
 import torch.nn as nn
+
+logger = logging.getLogger(__name__)
 
 
 class TTSHubInterface(nn.Module):
@@ -17,12 +20,6 @@ class TTSHubInterface(nn.Module):
         self.cfg = cfg
         self.task = task
         self.model = model
-        # this is useful for determining the device
-        self.register_buffer("_float_tensor", torch.tensor([0], dtype=torch.float))
-
-    @property
-    def device(self):
-        return self._float_tensor.device
 
     @classmethod
     def phonemize(
@@ -76,29 +73,35 @@ class TTSHubInterface(nn.Module):
             return text
 
     @classmethod
-    def _get_speaker(cls, task, speaker: Optional[int] = None):
-        speaker = task.data_cfg.config.get("hub", {}).get("speaker", speaker)
-        n_speakers = len(task.speaker_to_id or {})
-        if speaker is None:
-            if n_speakers > 0:
-                speaker = random.randint(0, n_speakers - 1)
-        else:
-            speaker = max(0, min(speaker, n_speakers - 1))
-        return speaker
-
-    @classmethod
-    def get_model_input(cls, task, text: str, speaker: Optional[int] = None):
-        cfg_hub = task.data_cfg.config.get("hub", {})
+    def get_model_input(
+            cls,
+            task,
+            text: str,
+            speaker: Optional[int] = None,
+            verbose: bool = False
+    ):
         phonemized = cls.phonemize(
             text,
-            cfg_hub.get("lang", None),
-            cfg_hub.get("phonemizer", None),
-            cfg_hub.get("preserve_punct", False),
-            cfg_hub.get("to_simplified_zh", False),
+            task.data_cfg.hub.get("lang", None),
+            task.data_cfg.hub.get("phonemizer", None),
+            task.data_cfg.hub.get("preserve_punct", False),
+            task.data_cfg.hub.get("to_simplified_zh", False),
         )
+        if verbose:
+            logger.info(f"phonemized: {phonemized}")
         tkn_cfg = task.data_cfg.bpe_tokenizer
         tokenized = cls.tokenize(phonemized, tkn_cfg)
-        spk = cls._get_speaker(task, speaker)
+        if verbose:
+            logger.info(f"tokenized: {phonemized}")
+
+        spk = task.data_cfg.hub.get("speaker", speaker)
+        n_speakers = len(task.speaker_to_id or {})
+        if spk is None and n_speakers > 0:
+            spk = random.randint(0, n_speakers - 1)
+        if spk is not None:
+            spk = max(0, min(spk, n_speakers - 1))
+        if verbose:
+            logger.info(f"speaker: {spk}")
         spk = None if spk is None else torch.Tensor([[spk]]).long()
 
         src_tokens = task.src_dict.encode_line(tokenized).view(1, -1)

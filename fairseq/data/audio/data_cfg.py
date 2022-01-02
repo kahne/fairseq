@@ -145,6 +145,10 @@ class S2TDataConfig(object):
         vocoder = self.config.get("vocoder", None)
         return self._auto_convert_to_abs_path(vocoder)
 
+    @property
+    def hub(self) -> Dict[str, str]:
+        return self.config.get("hub", {})
+
 
 class S2SDataConfig(S2TDataConfig):
     """Wrapper class for data config YAML"""

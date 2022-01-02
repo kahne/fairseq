@@ -21,6 +21,7 @@ from fairseq.models.text_to_speech.tacotron2 import Prenet, Postnet
 from fairseq.modules import LayerNorm, PositionalEmbedding, FairseqDropout
 from fairseq.data.data_utils import lengths_to_padding_mask
 from fairseq import utils
+from fairseq.models.text_to_speech.hub_interface import TTSHubInterface
 
 logger = logging.getLogger(__name__)
 
@@ -312,6 +313,37 @@ class TTSTransformerModel(FairseqEncoderDecoderModel):
     """
     Implementation for https://arxiv.org/pdf/1809.08895.pdf
     """
+
+    @classmethod
+    def hub_models(cls):
+        base_url = "http://dl.fbaipublicfiles.com/fairseq/s2"
+        model_ids = [
+            "tts_transformer-en-ljspeech",
+        ]
+        return {i: f"{base_url}/{i}.tar.gz" for i in model_ids}
+
+    @classmethod
+    def from_pretrained(
+            cls,
+            model_name_or_path,
+            checkpoint_file="model.pt",
+            data_name_or_path=".",
+            vocoder: str = "griffin_lim",
+            fp16: bool = False,
+            **kwargs,
+    ):
+        from fairseq import hub_utils
+
+        x = hub_utils.from_pretrained(
+            model_name_or_path,
+            checkpoint_file,
+            data_name_or_path,
+            archive_map=cls.hub_models(),
+            **kwargs,
+        )
+
+        logger.info(x["args"])
+        return TTSHubInterface(x["args"], x["task"], x["models"][0])
 
     @staticmethod
     def add_args(parser):

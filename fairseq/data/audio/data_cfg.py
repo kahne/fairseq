@@ -142,7 +142,8 @@ class S2TDataConfig(object):
 
     @property
     def vocoder(self) -> Optional[Dict[str, str]]:
-        return self.config.get("vocoder", None)
+        vocoder = self.config.get("vocoder", None)
+        return self._auto_convert_to_abs_path(vocoder)
 
 
 class S2SDataConfig(S2TDataConfig):

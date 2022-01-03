@@ -5,7 +5,7 @@
 
 from argparse import Namespace
 import logging
-from typing import Union, Tuple
+from typing import Union, Tuple, Optional
 
 import torch
 import torch.nn as nn
@@ -79,32 +79,40 @@ class S2THubInterface(nn.Module):
         return text if tokenizer is None else tokenizer.decode(text)
 
     @classmethod
-    def get_prefix_token(cls, task):
+    def get_prefix_token(cls, task, lang):
         prefix_size = int(task.data_cfg.prepend_tgt_lang_tag)
         prefix_tokens = None
         if prefix_size > 0:
-            lang = task.data_cfg.hub.get("tgt_lang", "en")
+            assert lang is not None
             lang_tag = SpeechToTextDataset.get_lang_tag_idx(lang, task.tgt_dict)
             prefix_tokens = torch.Tensor([lang_tag]).long().unsqueeze(0)
         return prefix_tokens
 
     @classmethod
     def get_prediction(
-        cls, task, model, generator, sample, synthesize_speech=False
+        cls, task, model, generator, sample, tgt_lang=None, synthesize_speech=False
     ) -> Union[str, Tuple[str, Tuple[np.array, int]]]:
-        prefix = cls.get_prefix_token(task)
+        _tgt_lang = tgt_lang or task.data_cfg.hub.get("tgt_lang", None)
+        prefix = cls.get_prefix_token(task, _tgt_lang)
         pred_tokens = generator.generate([model], sample, prefix_tokens=prefix)
         pred = cls.detokenize(task, pred_tokens[0][0]["tokens"])
 
-        tts_model_id = task.data_cfg.hub.get("tts_model_id", None)
-        if synthesize_speech and tts_model_id is not None:
-            _repo, _id = tts_model_id.split(":")
-            tts_model = torch.hub.load(_repo, _id)
-            pred = (pred, tts_model.predict(pred))
+        if synthesize_speech:
+            pfx = f"{_tgt_lang}_" if task.data_cfg.prepend_tgt_lang_tag else ""
+            tts_model_id = task.data_cfg.hub.get(f"{pfx}tts_model_id", None)
+            if tts_model_id is None:
+                logger.warning("TTS model configuration not found")
+            else:
+                _repo, _id = tts_model_id.split(":")
+                tts_model = torch.hub.load(_repo, _id)
+                pred = (pred, tts_model.predict(pred))
         return pred
 
     def predict(
-        self, audio: Union[str, np.array], synthesize_speech: bool = False,
+        self,
+        audio: Union[str, np.array],
+        tgt_lang: Optional[str] = None,
+        synthesize_speech: bool = False,
     ) -> Union[str, Tuple[str, Tuple[np.array, int]]]:
         # `audio` is either a file path or a (T,) numpy array
         # return either text or (text, synthetic speech)
@@ -114,6 +122,7 @@ class S2THubInterface(nn.Module):
             self.model,
             self.generator,
             sample,
+            tgt_lang=tgt_lang,
             synthesize_speech=synthesize_speech,
         )
         return pred

@@ -129,8 +129,7 @@ class TTSHubInterface(nn.Module):
 
     @classmethod
     def get_prediction(cls, model, generator, sample):
-        with torch.no_grad():
-            prediction = generator.generate(model, sample)
+        prediction = generator.generate(model, sample)
         return prediction[0]["waveform"]
 
     def predict(

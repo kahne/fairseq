@@ -5,7 +5,7 @@
 
 from argparse import Namespace
 import logging
-from typing import Union
+from typing import Union, Tuple
 
 import torch
 import torch.nn as nn
@@ -32,7 +32,6 @@ class S2THubInterface(nn.Module):
         self.task = task
         self.model = model
         self.model.eval()
-
         self.generator = self.task.build_generator([self.model], self.cfg)
 
     @classmethod
@@ -90,16 +89,27 @@ class S2THubInterface(nn.Module):
         return prefix_tokens
 
     @classmethod
-    def get_prediction(cls, task, model, generator, sample):
-        prefix_tokens = cls.get_prefix_token(task)
-        with torch.no_grad():
-            pred_tokens = generator.generate(
-                [model], sample, prefix_tokens=prefix_tokens
-            )[0][0]["tokens"]
-        return cls.detokenize(task, pred_tokens)
+    def get_prediction(
+        cls, task, model, generator, sample, speech_output=False
+    ) -> Union[str, Tuple[np.array, int]]:
+        prefix = cls.get_prefix_token(task)
+        pred_tokens = generator.generate([model], sample, prefix_tokens=prefix)
+        pred = cls.detokenize(task, pred_tokens[0][0]["tokens"])
 
-    def predict(self, audio: Union[str, np.array]) -> str:
+        tts_model_id = task.data_cfg.hub.get("tts_model_id", None)
+        if speech_output and tts_model_id is not None:
+            _repo, _id = tts_model_id.split(":")
+            tts_model = torch.hub.load(_repo, _id)
+            pred = tts_model.predict(pred)
+        return pred
+
+    def predict(
+        self, audio: Union[str, np.array], speech_output: bool = False
+    ) -> Union[str, Tuple[np.array, int]]:
         # `audio` is either a file path or a (T,) numpy array
+        # return either a translated text or speech
         sample = self.get_model_input(self.task, audio)
-        pred = self.get_prediction(self.task, self.model, self.generator, sample)
+        pred = self.get_prediction(
+            self.task, self.model, self.generator, sample, speech_output
+        )
         return pred

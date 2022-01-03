@@ -90,26 +90,36 @@ class S2THubInterface(nn.Module):
 
     @classmethod
     def get_prediction(
-        cls, task, model, generator, sample, speech_output=False
+        cls, task, model, generator, sample, synthesize_speech=False, verbose=False
     ) -> Union[str, Tuple[np.array, int]]:
         prefix = cls.get_prefix_token(task)
         pred_tokens = generator.generate([model], sample, prefix_tokens=prefix)
         pred = cls.detokenize(task, pred_tokens[0][0]["tokens"])
+        if verbose:
+            logger.info(f"translation: {pred}")
 
         tts_model_id = task.data_cfg.hub.get("tts_model_id", None)
-        if speech_output and tts_model_id is not None:
+        if synthesize_speech and tts_model_id is not None:
             _repo, _id = tts_model_id.split(":")
             tts_model = torch.hub.load(_repo, _id)
             pred = tts_model.predict(pred)
         return pred
 
     def predict(
-        self, audio: Union[str, np.array], speech_output: bool = False
+        self,
+        audio: Union[str, np.array],
+        synthesize_speech: bool = False,
+        verbose=False,
     ) -> Union[str, Tuple[np.array, int]]:
         # `audio` is either a file path or a (T,) numpy array
         # return either a translated text or speech
         sample = self.get_model_input(self.task, audio)
         pred = self.get_prediction(
-            self.task, self.model, self.generator, sample, speech_output
+            self.task,
+            self.model,
+            self.generator,
+            sample,
+            synthesize_speech=synthesize_speech,
+            verbose=verbose,
         )
         return pred

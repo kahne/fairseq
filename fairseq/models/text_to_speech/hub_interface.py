@@ -81,7 +81,7 @@ class TTSHubInterface(nn.Module):
 
     @classmethod
     def update_cfg_with_data_cfg(cls, cfg, data_cfg):
-        cfg["task"].vocoder = data_cfg.vocoder
+        cfg["task"].vocoder = data_cfg.vocoder.get("type", "griffin_lim")
 
     @classmethod
     def get_model_input(

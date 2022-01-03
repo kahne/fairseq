@@ -5,10 +5,13 @@
 
 from argparse import Namespace
 import logging
+from typing import Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchaudio.compliance.kaldi as kaldi
+import numpy as np
 
 from fairseq.data import encoders
 from fairseq.data.audio.audio_utils import (
@@ -28,22 +31,33 @@ class S2THubInterface(nn.Module):
         self.cfg = cfg
         self.task = task
         self.model = model
+        self.model.eval()
+
+        self.generator = self.task.build_generator([self.model], self.cfg)
 
     @classmethod
-    def get_model_input(cls, task, audio_path: str):
+    def get_model_input(cls, task, audio: Union[str, np.array]):
         input_type = task.data_cfg.hub.get("input_type", "fbank80")
         if input_type == "fbank80_w_utt_cmvn":
-            feat = get_fbank(audio_path)  # T x D
-            feat = utt_cmvn.UtteranceCMVN()(feat)
+            if isinstance(audio, str):
+                feat = utt_cmvn.UtteranceCMVN()(get_fbank(audio))
+                feat = feat.unsqueeze(0)  # T x D -> 1 x T x D
+            else:
+                feat = torch.from_numpy(audio).unsqueeze(0)  # T -> 1 x T
+                feat = kaldi.fbank(feat, num_mel_bins=80).numpy()  # 1 x T x D
         elif input_type in {"waveform", "standardized_waveform"}:
-            feat, sr = get_wav(audio_path)  # C x T
-            feat = convert_wav(feat, sr, to_sample_rate=16_000, to_mono=True)[0]
-            feat = feat.squeeze(0)  # 1 x T -> T
+            if isinstance(audio, str):
+                feat, sr = get_wav(audio)  # C x T
+                feat, _ = convert_wav(
+                    feat, sr, to_sample_rate=16_000, to_mono=True
+                )  # C x T -> 1 x T
+            else:
+                feat = audio.unsqueeze(0)  # T -> 1 x T
         else:
             raise ValueError(f"Unknown value: input_type = {input_type}")
 
-        src_lengths = torch.Tensor([feat.shape[0]]).long()
-        src_tokens = torch.from_numpy(feat).unsqueeze(0)  # -> 1 x T (x D)
+        src_lengths = torch.Tensor([feat.shape[1]]).long()
+        src_tokens = torch.from_numpy(feat)  # 1 x T (x D)
         if input_type == "standardized_waveform":
             with torch.no_grad():
                 src_tokens = F.layer_norm(src_tokens, src_tokens.shape)
@@ -75,15 +89,17 @@ class S2THubInterface(nn.Module):
             prefix_tokens = torch.Tensor([lang_tag]).long().unsqueeze(0)
         return prefix_tokens
 
-    def predict(self, audio_path: str):
-        self.model.eval()
-        sample = self.get_model_input(self.task, audio_path)
+    @classmethod
+    def get_prediction(cls, task, model, generator, sample):
+        prefix_tokens = cls.get_prefix_token(task)
+        with torch.no_grad():
+            pred_tokens = generator.generate(
+                [model], sample, prefix_tokens=prefix_tokens
+            )[0][0]["tokens"]
+        return cls.detokenize(task, pred_tokens)
 
-        prefix_tokens = self.get_prefix_token(self.task)
-        generator = self.task.build_generator([self.model], self.cfg)
-        pred_tokens = generator.generate(
-            [self.model], sample, prefix_tokens=prefix_tokens
-        )[0][0]["tokens"]
-        pred = self.detokenize(self.task, pred_tokens)
-
+    def predict(self, audio: Union[str, np.array]) -> str:
+        # `audio` is either a file path or a (T,) numpy array
+        sample = self.get_model_input(self.task, audio)
+        pred = self.get_prediction(self.task, self.model, self.generator, sample)
         return pred

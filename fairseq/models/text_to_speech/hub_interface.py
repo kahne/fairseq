@@ -5,11 +5,13 @@
 
 import logging
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
 import random
 
 import torch
 import torch.nn as nn
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +22,10 @@ class TTSHubInterface(nn.Module):
         self.cfg = cfg
         self.task = task
         self.model = model
+        self.model.eval()
 
         self.update_cfg_with_data_cfg(self.cfg, self.task.data_cfg)
+        self.generator = self.task.build_generator([self.model], self.cfg)
 
     @classmethod
     def phonemize(
@@ -123,9 +127,15 @@ class TTSHubInterface(nn.Module):
             "speaker": spk,
         }
 
-    def predict(self, text: str, speaker: Optional[int] = None, verbose: bool = False):
-        self.model.eval()
+    @classmethod
+    def get_prediction(cls, model, generator, sample):
+        with torch.no_grad():
+            prediction = generator.generate(model, sample)
+        return prediction[0]["waveform"]
+
+    def predict(
+        self, text: str, speaker: Optional[int] = None, verbose: bool = False
+    ) -> Tuple[np.array, int]:
         sample = self.get_model_input(self.task, text, speaker, verbose=verbose)
-        generator = self.task.build_generator([self.model], self.cfg)
-        generation = generator.generate(self.model, sample)
-        return generation[0]["waveform"], self.task.sr
+        waveform_pred = self.get_prediction(self.model, self.generator, sample)
+        return waveform_pred.numpy(), self.task.sr

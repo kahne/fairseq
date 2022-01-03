@@ -21,6 +21,8 @@ class TTSHubInterface(nn.Module):
         self.task = task
         self.model = model
 
+        self.update_cfg_with_data_cfg(self.cfg, self.task.data_cfg)
+
     @classmethod
     def phonemize(
         cls,
@@ -78,8 +80,12 @@ class TTSHubInterface(nn.Module):
             return text
 
     @classmethod
+    def update_cfg_with_data_cfg(cls, cfg, data_cfg):
+        cfg["task"].vocoder = data_cfg.vocoder
+
+    @classmethod
     def get_model_input(
-        cls, task, text: str, speaker: Optional[int] = None, verbose_log: bool = False
+        cls, task, text: str, speaker: Optional[int] = None, verbose: bool = False
     ):
         phonemized = cls.phonemize(
             text,
@@ -90,7 +96,7 @@ class TTSHubInterface(nn.Module):
         )
         tkn_cfg = task.data_cfg.bpe_tokenizer
         tokenized = cls.tokenize(phonemized, tkn_cfg)
-        if verbose_log:
+        if verbose:
             logger.info(f"text: {text}")
             logger.info(f"phonemized: {phonemized}")
             logger.info(f"tokenized: {tokenized}")
@@ -101,7 +107,7 @@ class TTSHubInterface(nn.Module):
             spk = random.randint(0, n_speakers - 1)
         if spk is not None:
             spk = max(0, min(spk, n_speakers - 1))
-        if verbose_log:
+        if verbose:
             logger.info(f"speaker: {spk}")
         spk = None if spk is None else torch.Tensor([[spk]]).long()
 
@@ -117,11 +123,9 @@ class TTSHubInterface(nn.Module):
             "speaker": spk,
         }
 
-    def predict(
-        self, text: str, speaker: Optional[int] = None, verbose_log: bool = False
-    ):
-        sample = self.get_model_input(self.task, text, speaker, verbose_log=verbose_log)
+    def predict(self, text: str, speaker: Optional[int] = None, verbose: bool = False):
         self.model.eval()
+        sample = self.get_model_input(self.task, text, speaker, verbose=verbose)
         generator = self.task.build_generator([self.model], self.cfg)
         generation = generator.generate(self.model, sample)
         return generation[0]["waveform"], self.task.sr

@@ -102,6 +102,7 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
             model_name_or_path,
             checkpoint_file="model.pt",
             data_name_or_path=".",
+            config_yaml="config.yaml",
             prefix_size=0,
             **kwargs,
     ):
@@ -111,6 +112,7 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
             checkpoint_file,
             data_name_or_path,
             archive_map=cls.hub_models(),
+            config_yaml=config_yaml,
             prefix_size=prefix_size,
             **kwargs,
         )

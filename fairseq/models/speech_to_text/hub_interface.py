@@ -59,8 +59,9 @@ class S2THubInterface(nn.Module):
 
     @classmethod
     def detokenize(cls, task, cfg, tokens):
-        if cfg.prefix_size > 0:
-            tokens = tokens[cfg.prefix_size :]
+        prefix_size = cfg["generation"]["prefix_size"]
+        if prefix_size > 0:
+            tokens = tokens[prefix_size:]
         text = task.tgt_dict.string(tokens)
         tkn_cfg = task.data_cfg.bpe_tokenizer
         tokenizer = encoders.build_bpe(Namespace(**tkn_cfg))

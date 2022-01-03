@@ -23,19 +23,21 @@ class TTSHubInterface(nn.Module):
 
     @classmethod
     def phonemize(
-            cls,
-            text: str,
-            lang: Optional[str],
-            phonemizer: Optional[str] = None,
-            preserve_punct: bool = False,
-            to_simplified_zh: bool = False
+        cls,
+        text: str,
+        lang: Optional[str],
+        phonemizer: Optional[str] = None,
+        preserve_punct: bool = False,
+        to_simplified_zh: bool = False,
     ):
         if to_simplified_zh:
             import hanziconv
+
             text = hanziconv.HanziConv.toSimplified(text)
 
         if phonemizer == "g2p":
             import g2p_en
+
             g2p = g2p_en.G2p()
             if preserve_punct:
                 return " ".join("|" if p == " " else p for p in g2p(text))
@@ -44,12 +46,14 @@ class TTSHubInterface(nn.Module):
                 return " ".join(p for p in res if p.isalnum())
         if phonemizer == "g2pc":
             import g2pc
+
             g2p = g2pc.G2pC()
             return " ".join([w[3] for w in g2p(text)])
         elif phonemizer == "ipa":
             assert lang is not None
             import phonemizer
             from phonemizer.separator import Separator
+
             lang_map = {"en": "en-us", "fr": "fr-fr"}
             return phonemizer.phonemize(
                 text,
@@ -66,6 +70,7 @@ class TTSHubInterface(nn.Module):
         if sentencepiece_model is not None:
             assert Path(sentencepiece_model).exists()
             import sentencepiece as sp
+
             spm = sp.SentencePieceProcessor()
             spm.Load(sentencepiece_model)
             return " ".join(spm.Encode(text, out_type=str))
@@ -74,11 +79,7 @@ class TTSHubInterface(nn.Module):
 
     @classmethod
     def get_model_input(
-            cls,
-            task,
-            text: str,
-            speaker: Optional[int] = None,
-            verbose_log: bool = False
+        cls, task, text: str, speaker: Optional[int] = None, verbose_log: bool = False
     ):
         phonemized = cls.phonemize(
             text,
@@ -110,21 +111,16 @@ class TTSHubInterface(nn.Module):
             "net_input": {
                 "src_tokens": src_tokens,
                 "src_lengths": src_lengths,
-                "prev_output_tokens": None
+                "prev_output_tokens": None,
             },
             "target_lengths": None,
             "speaker": spk,
         }
 
     def predict(
-            self,
-            text: str,
-            speaker: Optional[int] = None,
-            verbose_log: bool = False
+        self, text: str, speaker: Optional[int] = None, verbose_log: bool = False
     ):
-        sample = self.get_model_input(
-            self.task, text, speaker, verbose_log=verbose_log
-        )
+        sample = self.get_model_input(self.task, text, speaker, verbose_log=verbose_log)
         self.model.eval()
         generator = self.task.build_generator([self.model], self.cfg)
         generation = generator.generate(self.model, sample)

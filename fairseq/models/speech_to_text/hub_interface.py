@@ -57,8 +57,12 @@ class S2THubInterface(nn.Module):
             "speaker": None,
         }
 
-    def detokenize(self, text: str):
-        tkn_cfg = self.task.data_cfg.bpe_tokenizer
+    @classmethod
+    def detokenize(cls, task, cfg, tokens):
+        if cfg.prefix_size > 0:
+            tokens = tokens[cfg.prefix_size :]
+        text = task.tgt_dict.string(tokens)
+        tkn_cfg = task.data_cfg.bpe_tokenizer
         tokenizer = encoders.build_bpe(Namespace(**tkn_cfg))
         return text if tokenizer is None else tokenizer.decode(text)
 
@@ -68,5 +72,6 @@ class S2THubInterface(nn.Module):
         sample = self.get_model_input(self.task, audio_path)
         generator = self.task.build_generator([self.model], self.task)
         pred_tokens = generator.generate([self.model], sample)[0][0]["tokens"]
-        pred = self.detokenize(self.task.tgt_dict.string(pred_tokens))
+        pred = self.detokenize(self.task, self.cfg, pred_tokens)
+
         return pred

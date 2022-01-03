@@ -442,6 +442,13 @@ class XMTransformerModel(FairseqEncoderDecoderModel):
             "xm_transformer_600m-en_ar-multi_domain",
             "xm_transformer_600m-en_tr-multi_domain",
             "xm_transformer_600m-en_vi-multi_domain",
+            "xm_transformer-21_en-xls_r_300m",
+            "xm_transformer-en_15-xls_r_300m",
+            "xm_transformer-21_en-xls_r_1b",
+            "xm_transformer-en_15-xls_r_1b",
+            "xm_transformer-21_en-xls_r_2b",
+            "xm_transformer-en_15-xls_r_2b",
+            "xm_transformer-22_16-xls_r_2b",
         ]
         return {i: f"{base_url}/{i}.tar.gz" for i in model_ids}
 

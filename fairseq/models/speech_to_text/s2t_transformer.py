@@ -103,7 +103,6 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
             checkpoint_file="model.pt",
             data_name_or_path=".",
             config_yaml="config.yaml",
-            prefix_size=0,
             **kwargs,
     ):
         from fairseq import hub_utils
@@ -113,7 +112,6 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
             data_name_or_path,
             archive_map=cls.hub_models(),
             config_yaml=config_yaml,
-            prefix_size=prefix_size,
             **kwargs,
         )
         return S2THubInterface(x["args"], x["task"], x["models"][0])

@@ -17,6 +17,7 @@ from fairseq.data.audio.audio_utils import (
     get_fbank,
 )
 import fairseq.data.audio.feature_transforms.utterance_cmvn as utt_cmvn
+from fairseq.data.audio.speech_to_text_dataset import SpeechToTextDataset
 
 logger = logging.getLogger(__name__)
 
@@ -58,21 +59,31 @@ class S2THubInterface(nn.Module):
         }
 
     @classmethod
-    def detokenize(cls, task, cfg, tokens):
-        prefix_size = cfg["generation"]["prefix_size"]
-        if prefix_size > 0:
-            tokens = tokens[prefix_size:]
+    def detokenize(cls, task, tokens):
         text = task.tgt_dict.string(tokens)
         tkn_cfg = task.data_cfg.bpe_tokenizer
         tokenizer = encoders.build_bpe(Namespace(**tkn_cfg))
         return text if tokenizer is None else tokenizer.decode(text)
 
+    @classmethod
+    def get_prefix_token(cls, task):
+        prefix_size = int(task.data_cfg.prepend_tgt_lang_tag)
+        prefix_tokens = None
+        if prefix_size > 0:
+            lang = task.data_cfg.hub.get("tgt_lang", "en")
+            lang_tag = SpeechToTextDataset.get_lang_tag_idx(lang, task.tgt_dict)
+            prefix_tokens = torch.Tensor([lang_tag]).long().unsqueeze(0)
+        return prefix_tokens
+
     def predict(self, audio_path: str):
         self.model.eval()
-
         sample = self.get_model_input(self.task, audio_path)
-        generator = self.task.build_generator([self.model], self.task)
-        pred_tokens = generator.generate([self.model], sample)[0][0]["tokens"]
-        pred = self.detokenize(self.task, self.cfg, pred_tokens)
+
+        prefix_tokens = self.get_prefix_token(self.task)
+        generator = self.task.build_generator([self.model], self.cfg)
+        pred_tokens = generator.generate(
+            [self.model], sample, prefix_tokens=prefix_tokens
+        )[0][0]["tokens"]
+        pred = self.detokenize(self.task, pred_tokens)
 
         return pred

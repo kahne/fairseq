@@ -11,7 +11,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio.compliance.kaldi as kaldi
-import numpy as np
 
 from fairseq.data import encoders
 from fairseq.data.audio.audio_utils import (
@@ -35,15 +34,14 @@ class S2THubInterface(nn.Module):
         self.generator = self.task.build_generator([self.model], self.cfg)
 
     @classmethod
-    def get_model_input(cls, task, audio: Union[str, np.array]):
+    def get_model_input(cls, task, audio: Union[str, torch.Tensor]):
         input_type = task.data_cfg.hub.get("input_type", "fbank80")
         if input_type == "fbank80_w_utt_cmvn":
             if isinstance(audio, str):
                 feat = utt_cmvn.UtteranceCMVN()(get_fbank(audio))
                 feat = feat.unsqueeze(0)  # T x D -> 1 x T x D
             else:
-                feat = torch.from_numpy(audio).unsqueeze(0)  # T -> 1 x T
-                feat = kaldi.fbank(feat, num_mel_bins=80).numpy()  # 1 x T x D
+                feat = kaldi.fbank(audio, num_mel_bins=80).numpy()  # 1 x T x D
         elif input_type in {"waveform", "standardized_waveform"}:
             if isinstance(audio, str):
                 feat, sr = get_wav(audio)  # C x T
@@ -51,7 +49,7 @@ class S2THubInterface(nn.Module):
                     feat, sr, to_sample_rate=16_000, to_mono=True
                 )  # C x T -> 1 x T
             else:
-                feat = audio.unsqueeze(0)  # T -> 1 x T
+                feat = audio.numpy()
         else:
             raise ValueError(f"Unknown value: input_type = {input_type}")
 
@@ -91,7 +89,7 @@ class S2THubInterface(nn.Module):
     @classmethod
     def get_prediction(
         cls, task, model, generator, sample, tgt_lang=None, synthesize_speech=False
-    ) -> Union[str, Tuple[str, Tuple[np.array, int]]]:
+    ) -> Union[str, Tuple[str, Tuple[torch.Tensor, int]]]:
         _tgt_lang = tgt_lang or task.data_cfg.hub.get("tgt_lang", None)
         prefix = cls.get_prefix_token(task, _tgt_lang)
         pred_tokens = generator.generate([model], sample, prefix_tokens=prefix)
@@ -110,11 +108,11 @@ class S2THubInterface(nn.Module):
 
     def predict(
         self,
-        audio: Union[str, np.array],
+        audio: Union[str, torch.Tensor],
         tgt_lang: Optional[str] = None,
         synthesize_speech: bool = False,
-    ) -> Union[str, Tuple[str, Tuple[np.array, int]]]:
-        # `audio` is either a file path or a (T,) numpy array
+    ) -> Union[str, Tuple[str, Tuple[torch.Tensor, int]]]:
+        # `audio` is either a file path or a 1xT Tensor
         # return either text or (text, synthetic speech)
         sample = self.get_model_input(self.task, audio)
         pred = self.get_prediction(

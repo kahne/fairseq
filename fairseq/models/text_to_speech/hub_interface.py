@@ -11,8 +11,6 @@ import random
 import torch
 import torch.nn as nn
 
-import numpy as np
-
 logger = logging.getLogger(__name__)
 
 
@@ -128,13 +126,13 @@ class TTSHubInterface(nn.Module):
         }
 
     @classmethod
-    def get_prediction(cls, model, generator, sample):
+    def get_prediction(cls, model, generator, sample) -> torch.Tensor:
         prediction = generator.generate(model, sample)
         return prediction[0]["waveform"]
 
     def predict(
         self, text: str, speaker: Optional[int] = None, verbose: bool = False
-    ) -> Tuple[np.array, int]:
+    ) -> Tuple[torch.Tensor, int]:
         sample = self.get_model_input(self.task, text, speaker, verbose=verbose)
         waveform_pred = self.get_prediction(self.model, self.generator, sample)
-        return waveform_pred.numpy(), self.task.sr
+        return waveform_pred, self.task.sr

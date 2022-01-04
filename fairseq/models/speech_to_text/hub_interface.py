@@ -101,8 +101,11 @@ class S2THubInterface(nn.Module):
             if tts_model_id is None:
                 logger.warning("TTS model configuration not found")
             else:
+                tts_dir = task.data_cfg.root / "tts"
+                tts_dir.mkdir(exist_ok=True, parent=True)
+                torch.hub.set_dir(tts_dir)
                 _repo, _id = tts_model_id.split(":")
-                tts_model = torch.hub.load(_repo, _id)
+                tts_model = torch.hub.load(_repo, _id, verbose=False)
                 pred = (pred, tts_model.predict(pred))
         return pred
 

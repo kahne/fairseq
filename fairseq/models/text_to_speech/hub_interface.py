@@ -126,13 +126,12 @@ class TTSHubInterface(nn.Module):
         }
 
     @classmethod
-    def get_prediction(cls, model, generator, sample) -> torch.Tensor:
+    def get_prediction(cls, task, model, generator, sample) -> Tuple[torch.Tensor, int]:
         prediction = generator.generate(model, sample)
-        return prediction[0]["waveform"]
+        return prediction[0]["waveform"], task.sr
 
     def predict(
         self, text: str, speaker: Optional[int] = None, verbose: bool = False
     ) -> Tuple[torch.Tensor, int]:
         sample = self.get_model_input(self.task, text, speaker, verbose=verbose)
-        waveform_pred = self.get_prediction(self.model, self.generator, sample)
-        return waveform_pred, self.task.sr
+        return self.get_prediction(self.task, self.model, self.generator, sample)

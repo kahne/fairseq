@@ -115,7 +115,7 @@ class S2THubInterface(nn.Module):
         # `audio` is either a file path or a 1xT Tensor
         # return either text or (text, synthetic speech)
         sample = self.get_model_input(self.task, audio)
-        pred = self.get_prediction(
+        return self.get_prediction(
             self.task,
             self.model,
             self.generator,
@@ -123,4 +123,3 @@ class S2THubInterface(nn.Module):
             tgt_lang=tgt_lang,
             synthesize_speech=synthesize_speech,
         )
-        return pred

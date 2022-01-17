@@ -339,6 +339,7 @@ class FastSpeech2Model(FairseqEncoderModel):
         model_ids = [
             "fastspeech2-en-ljspeech",
             "fastspeech2-en-200_speaker-cv4",
+            "fastspeech2-en-ljspeech-u100",
         ]
         return {i: f"{base_url}/{i}.tar.gz" for i in model_ids}
 
